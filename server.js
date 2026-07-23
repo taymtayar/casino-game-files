@@ -292,6 +292,36 @@ app.get('/api/history/:roundId', async (req, res, next) => {
     }
 });
 
+/**
+ * @route GET /api/history
+ * @description Retrieves a list of recent completed game rounds for audit inspection.
+ */
+app.get('/api/history', async (req, res, next) => {
+    try {
+        const limit = parseInt(req.query.limit) || 20;
+        const keys = await redisClient.lRange('global_game_history', 0, limit - 1);
+
+        if (!keys || keys.length === 0) {
+            return res.json({ count: 0, history: [] });
+        }
+
+        const historyRecords = [];
+        for (const key of keys) {
+            const data = await redisClient.get(key);
+            if (data) {
+                historyRecords.push(JSON.parse(data));
+            }
+        }
+
+        res.json({
+            count: historyRecords.length,
+            history: historyRecords,
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // --- Global Error Handler ---
 // This must be the LAST middleware added.
 app.use((err, req, res, next) => {
