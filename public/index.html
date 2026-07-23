@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iGaming RGS Client</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="game-container">
+        <h1>Double or Nothing</h1>
+
+        <div id="display">
+            <div class="balance-container">
+                <span>Balance:</span>
+                <span id="balance-amount">100.00</span>
+            </div>
+            <p id="message">Place a bet to start!</p>
+        </div>
+
+        <div id="controls">
+            <button id="bet-btn">Bet 1.00</button>
+            <button id="doubledown-btn" class="hidden">Double Down</button>
+            <button id="cashout-btn" class="hidden">Cash Out (2.00x)</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
