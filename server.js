@@ -119,6 +119,18 @@ app.post('/api/bet', async (req, res, next) => { // Add 'next' for error handlin
         if (!isStep1Win) {
             // If the player loses Step 1, the round is over. Clean up immediately.
             await redisClient.del(roundId);
+
+            // Save permanent audit record for Step 1 loss
+            await saveAuditLog(roundId, {
+                action: 'BET_STEP1_LOSS',
+                clientSeed,
+                serverSeed,
+                betAmount,
+                step1Outcome: 'lose',
+                amountWon: 0,
+                finalBalance: newBalance,
+            });
+
             return res.json({
                 round_id: roundId,
                 step_1_outcome: "lose",
@@ -164,29 +176,53 @@ const findActiveRound = async (req, res, next) => {
 };
 
 /**
- * @route POST /api/cashout
- * @description Executes the "cash out" action for an active round, awarding the 2.00x Step 1 win.
- * @param {object} req.body - The request body.
- * @param {string} req.body.round_id - The ID of the active round to cash out.
- * @param {number} req.body.balance - The player's current balance before this action.
- * @returns {object} 200 - On success, returns a confirmation and the amount won.
- * @returns {object} 404 - If the round_id is not found or already completed.
+ * Helper function to permanently save completed game round records in Redis for auditing.
+ */
+const saveAuditLog = async (roundId, eventData) => {
+    try {
+        const historyKey = `history:${roundId}`;
+        const logEntry = {
+            roundId,
+            ...eventData,
+            timestamp: new Date().toISOString(),
+        };
+        await redisClient.set(historyKey, JSON.stringify(logEntry));
+        await redisClient.lPush('global_game_history', historyKey);
+    } catch (err) {
+        console.error(`Failed to save audit log for ${roundId}:`, err);
+    }
+};
+
+/**
+ * @route POST /api/doubledown
+ * @description Executes the "double down" action for an active round.
  */
 app.post('/api/doubledown', findActiveRound, async (req, res, next) => {
     try {
-        // The roundData is already attached to req by the findActiveRound middleware
         const { roundData } = req;
         const { round_id, balance } = req.body;
 
         // 1. Retrieve the pre-generated outcome
-        const { step2Outcome, betAmount } = roundData;
+        const { step2Outcome, betAmount, clientSeed, serverSeed } = roundData;
         const amountWon = betAmount * step2Outcome.multiplier;
         const newBalance = balance + amountWon;
 
         // 2. Clean up the completed round from Redis
         await redisClient.del(round_id);
 
-        // 3. Send the final response
+        // 3. Save permanent audit record
+        await saveAuditLog(round_id, {
+            action: 'DOUBLE_DOWN',
+            clientSeed,
+            serverSeed,
+            betAmount,
+            step2Tier: step2Outcome.name,
+            finalMultiplier: step2Outcome.multiplier,
+            amountWon,
+            finalBalance: newBalance,
+        });
+
+        // 4. Send the final response
         res.json({
             round_id: round_id,
             step_2_tier: step2Outcome.name,
@@ -202,11 +238,6 @@ app.post('/api/doubledown', findActiveRound, async (req, res, next) => {
 /**
  * @route POST /api/cashout
  * @description Executes the "cash out" action for an active round, awarding the 2.00x Step 1 win.
- * @param {object} req.body - The request body.
- * @param {string} req.body.round_id - The ID of the active round to cash out.
- * @param {number} req.body.balance - The player's current balance before this action.
- * @returns {object} 200 - On success, returns a confirmation and the amount won.
- * @returns {object} 404 - If the round_id is not found or already completed.
  */
 app.post('/api/cashout', findActiveRound, async (req, res, next) => {
     try {
@@ -220,12 +251,42 @@ app.post('/api/cashout', findActiveRound, async (req, res, next) => {
         // 2. Clean up the completed round from Redis
         await redisClient.del(round_id);
 
-        // 3. Send the final response
+        // 3. Save permanent audit record
+        await saveAuditLog(round_id, {
+            action: 'CASHOUT',
+            clientSeed: roundData.clientSeed,
+            serverSeed: roundData.serverSeed,
+            betAmount: roundData.betAmount,
+            finalMultiplier: GAME_CONSTANTS.STEP_1.PAYOUT_MULTIPLIER,
+            amountWon,
+            finalBalance: newBalance,
+        });
+
+        // 4. Send the final response
         res.json({
             message: "Cashed out successfully",
             amount_won: amountWon,
             balance: newBalance,
         });
+    } catch (error) {
+        next(error);
+    }
+});
+
+/**
+ * @route GET /api/history/:roundId
+ * @description Retrieves the permanent audit record for a specific completed round.
+ */
+app.get('/api/history/:roundId', async (req, res, next) => {
+    try {
+        const { roundId } = req.params;
+        const record = await redisClient.get(`history:${roundId}`);
+
+        if (!record) {
+            return res.status(404).json({ error: "Audit record not found for this round." });
+        }
+
+        res.json(JSON.parse(record));
     } catch (error) {
         next(error);
     }
