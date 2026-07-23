@@ -139,6 +139,8 @@ app.post('/api/bet', async (req, res, next) => { // Add 'next' for error handlin
             });
         }
 
+        console.log(`[GAME LOG] Round ${roundId} | Action: BET_STEP1_WIN | Outcome: WIN (2.00x) | Bet: $${betAmount} | New Balance: $${newBalance}`);
+
         res.json({
             round_id: roundId,
             step_1_outcome: "win",
@@ -188,6 +190,9 @@ const saveAuditLog = async (roundId, eventData) => {
         };
         await redisClient.set(historyKey, JSON.stringify(logEntry));
         await redisClient.lPush('global_game_history', historyKey);
+
+        const outcomeSummary = eventData.step2Tier ? `Tier: ${eventData.step2Tier} (${eventData.finalMultiplier}x)` : (eventData.step1Outcome || 'COMPLETED');
+        console.log(`[GAME LOG] Round ${roundId} | Action: ${eventData.action} | Outcome: ${outcomeSummary} | Bet: $${eventData.betAmount} | Won: $${eventData.amountWon} | Final Balance: $${eventData.finalBalance}`);
     } catch (err) {
         console.error(`Failed to save audit log for ${roundId}:`, err);
     }
