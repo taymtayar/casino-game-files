@@ -3,6 +3,7 @@ const express = require('express');
 const crypto = require('crypto'); // For Provably Fair RNG
 const redis = require('redis'); // Import the redis library
 const morgan = require('morgan'); // Import the HTTP request logger
+const walletService = require('./walletService'); // Import the wallet service
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -73,66 +74,94 @@ const getProvablyFairResult = (serverSeed, clientSeed, nonce) => {
  */
 app.post('/api/bet', async (req, res, next) => { // Add 'next' for error handling
     try {
-        // For this MVP, we'll assume clientSeed, betAmount, and balance are in the request body.
-        const { clientSeed, betAmount, balance } = req.body;
+        // For this MVP, we'll assume clientSeed, betAmount, token, and player_id are in the request body.
+        const { clientSeed, betAmount, token, player_id } = req.body;
 
-        if (!clientSeed || !betAmount || balance === undefined) {
-            return res.status(400).json({ error: "clientSeed, betAmount, and balance are required." });
+        if (!clientSeed || !betAmount || !token || !player_id) {
+            return res.status(400).json({ error: "clientSeed, betAmount, token, and player_id are required." });
         }
 
         // 1. Generate server-side secrets for this round
         const serverSeed = crypto.randomBytes(32).toString('hex');
         const roundId = `req_${crypto.randomBytes(12).toString('hex')}`;
 
-        // --- Step 1: Determine initial win/loss ---
-        const step1Roll = module.exports.getProvablyFairResult(serverSeed, clientSeed, 0); // Nonce 0 for Step 1
-        const isStep1Win = step1Roll < GAME_CONSTANTS.STEP_1.WIN_PROBABILITY;
-
-        // --- Step 2: Pre-generate the double-down outcome regardless of Step 1 result ---
-        const step2Roll = module.exports.getProvablyFairResult(serverSeed, clientSeed, 1); // Nonce 1 for Step 2
-        let cumulativeProb = 0;
-        let step2Outcome = { name: 'Bust', multiplier: 0 }; // Default to Bust
-
-        for (const tier of GAME_CONSTANTS.STEP_2_TIERS) {
-            cumulativeProb += tier.probability;
-            if (step2Roll < cumulativeProb) {
-                step2Outcome = { name: tier.name, multiplier: tier.multiplier };
-                break;
-            }
+        // --- Wallet Integration: Check Balance & Debit ---
+        const currentBalance = await walletService.getBalance(token, player_id);
+        if (currentBalance < betAmount) {
+            return res.status(400).json({ error: "Insufficient funds." });
         }
+        
+        // Deduct the bet amount
+        const newBalance = await walletService.debit(token, player_id, betAmount, roundId, `${roundId}_debit`);
 
-        // 2. Store the full pre-generated path in Redis
-        const roundData = {
-            serverSeed, // Stored to be revealed later for verification
-            clientSeed,
-            betAmount,
-            step1Outcome: isStep1Win ? 'win' : 'lose',
-            step2Outcome, // Contains { name, multiplier }
-        };
-        // Use SET with EX to automatically expire the round data
-        await redisClient.set(roundId, JSON.stringify(roundData), {
-            EX: ROUND_EXPIRATION_SECONDS,
-        });
+        try {
+            // --- Step 1: Determine initial win/loss ---
+            const step1Roll = module.exports.getProvablyFairResult(serverSeed, clientSeed, 0); // Nonce 0 for Step 1
+            const isStep1Win = step1Roll < GAME_CONSTANTS.STEP_1.WIN_PROBABILITY;
 
-        // 3. Construct and send the response based on Step 1 outcome
-        const newBalance = balance - betAmount;
-        if (!isStep1Win) {
-            // If the player loses Step 1, the round is over. Clean up immediately.
-            await redisClient.del(roundId);
-            return res.json({
+            // --- Step 2: Pre-generate the double-down outcome regardless of Step 1 result ---
+            const step2Roll = module.exports.getProvablyFairResult(serverSeed, clientSeed, 1); // Nonce 1 for Step 2
+            let cumulativeProb = 0;
+            let step2Outcome = { name: 'Bust', multiplier: 0 }; // Default to Bust
+
+            for (const tier of GAME_CONSTANTS.STEP_2_TIERS) {
+                cumulativeProb += tier.probability;
+                if (step2Roll < cumulativeProb) {
+                    step2Outcome = { name: tier.name, multiplier: tier.multiplier };
+                    break;
+                }
+            }
+
+            // 2. Store the full pre-generated path in Redis
+            const roundData = {
+                serverSeed, // Stored to be revealed later for verification
+                clientSeed,
+                betAmount,
+                step1Outcome: isStep1Win ? 'win' : 'lose',
+                step2Outcome, // Contains { name, multiplier }
+            };
+            // Use SET with EX to automatically expire the round data
+            await redisClient.set(roundId, JSON.stringify(roundData), {
+                EX: ROUND_EXPIRATION_SECONDS,
+            });
+
+            // 3. Construct and send the response based on Step 1 outcome
+            if (!isStep1Win) {
+                // If the player loses Step 1, the round is over. Clean up immediately.
+                await redisClient.del(roundId);
+
+                // Save permanent audit record for Step 1 loss
+                await saveAuditLog(roundId, {
+                    action: 'BET_STEP1_LOSS',
+                    clientSeed,
+                    serverSeed,
+                    betAmount,
+                    step1Outcome: 'lose',
+                    amountWon: 0,
+                    finalBalance: newBalance,
+                });
+
+                return res.json({
+                    round_id: roundId,
+                    step_1_outcome: "lose",
+                    current_multiplier: 0.00,
+                    balance: newBalance,
+                });
+            }
+
+            console.log(`[GAME LOG] Round ${roundId} | Action: BET_STEP1_WIN | Outcome: WIN (2.00x) | Bet: $${betAmount} | New Balance: $${newBalance}`);
+
+            res.json({
                 round_id: roundId,
-                step_1_outcome: "lose",
-                current_multiplier: 0.00,
+                step_1_outcome: "win",
+                current_multiplier: GAME_CONSTANTS.STEP_1.PAYOUT_MULTIPLIER,
                 balance: newBalance,
             });
+        } catch (innerError) {
+            console.error(`[GAME LOG] Round ${roundId} | CRITICAL ERROR | Rolling back debit of $${betAmount}...`);
+            await walletService.rollback(token, player_id, betAmount, roundId, `${roundId}_rollback`);
+            throw innerError;
         }
-
-        res.json({
-            round_id: roundId,
-            step_1_outcome: "win",
-            current_multiplier: GAME_CONSTANTS.STEP_1.PAYOUT_MULTIPLIER,
-            balance: newBalance,
-        });
     } catch (error) {
         next(error); // Pass any errors to the global error handler
     }
@@ -143,10 +172,10 @@ app.post('/api/bet', async (req, res, next) => { // Add 'next' for error handlin
  * Attaches round data to the request object if found.
  */
 const findActiveRound = async (req, res, next) => {
-    const { round_id, balance } = req.body;
+    const { round_id, token, player_id } = req.body;
 
-    if (!round_id || balance === undefined) {
-        return res.status(400).json({ error: "round_id and balance are required." });
+    if (!round_id || !token || !player_id) {
+        return res.status(400).json({ error: "round_id, token, and player_id are required." });
     }
 
     try {
@@ -164,29 +193,61 @@ const findActiveRound = async (req, res, next) => {
 };
 
 /**
- * @route POST /api/cashout
- * @description Executes the "cash out" action for an active round, awarding the 2.00x Step 1 win.
- * @param {object} req.body - The request body.
- * @param {string} req.body.round_id - The ID of the active round to cash out.
- * @param {number} req.body.balance - The player's current balance before this action.
- * @returns {object} 200 - On success, returns a confirmation and the amount won.
- * @returns {object} 404 - If the round_id is not found or already completed.
+ * Helper function to permanently save completed game round records in Redis for auditing.
+ */
+const saveAuditLog = async (roundId, eventData) => {
+    try {
+        const historyKey = `history:${roundId}`;
+        const logEntry = {
+            roundId,
+            ...eventData,
+            timestamp: new Date().toISOString(),
+        };
+        await redisClient.set(historyKey, JSON.stringify(logEntry));
+        await redisClient.lPush('global_game_history', historyKey);
+
+        const outcomeSummary = eventData.step2Tier ? `Tier: ${eventData.step2Tier} (${eventData.finalMultiplier}x)` : (eventData.step1Outcome || 'COMPLETED');
+        console.log(`[GAME LOG] Round ${roundId} | Action: ${eventData.action} | Outcome: ${outcomeSummary} | Bet: $${eventData.betAmount} | Won: $${eventData.amountWon} | Final Balance: $${eventData.finalBalance}`);
+    } catch (err) {
+        console.error(`Failed to save audit log for ${roundId}:`, err);
+    }
+};
+
+/**
+ * @route POST /api/doubledown
+ * @description Executes the "double down" action for an active round.
  */
 app.post('/api/doubledown', findActiveRound, async (req, res, next) => {
     try {
-        // The roundData is already attached to req by the findActiveRound middleware
         const { roundData } = req;
-        const { round_id, balance } = req.body;
+        const { round_id, token, player_id } = req.body;
+
+        // 0. Atomic check: try to delete the round immediately to prevent race conditions
+        const deleteCount = await redisClient.del(round_id);
+        if (deleteCount === 0) {
+            return res.status(400).json({ error: "Round has already been processed (duplicate request)." });
+        }
 
         // 1. Retrieve the pre-generated outcome
-        const { step2Outcome, betAmount } = roundData;
+        const { step2Outcome, betAmount, clientSeed, serverSeed } = roundData;
         const amountWon = betAmount * step2Outcome.multiplier;
-        const newBalance = balance + amountWon;
+        
+        // 1b. Credit the wallet
+        const newBalance = await walletService.credit(token, player_id, amountWon, round_id, `${round_id}_credit_dd`);
 
-        // 2. Clean up the completed round from Redis
-        await redisClient.del(round_id);
+        // 2. Save permanent audit record
+        await saveAuditLog(round_id, {
+            action: 'DOUBLE_DOWN',
+            clientSeed,
+            serverSeed,
+            betAmount,
+            step2Tier: step2Outcome.name,
+            finalMultiplier: step2Outcome.multiplier,
+            amountWon,
+            finalBalance: newBalance,
+        });
 
-        // 3. Send the final response
+        // 4. Send the final response
         res.json({
             round_id: round_id,
             step_2_tier: step2Outcome.name,
@@ -202,29 +263,89 @@ app.post('/api/doubledown', findActiveRound, async (req, res, next) => {
 /**
  * @route POST /api/cashout
  * @description Executes the "cash out" action for an active round, awarding the 2.00x Step 1 win.
- * @param {object} req.body - The request body.
- * @param {string} req.body.round_id - The ID of the active round to cash out.
- * @param {number} req.body.balance - The player's current balance before this action.
- * @returns {object} 200 - On success, returns a confirmation and the amount won.
- * @returns {object} 404 - If the round_id is not found or already completed.
  */
 app.post('/api/cashout', findActiveRound, async (req, res, next) => {
     try {
         const { roundData } = req;
-        const { round_id, balance } = req.body;
+        const { round_id, token, player_id } = req.body;
+
+        // 0. Atomic check: try to delete the round immediately to prevent race conditions
+        const deleteCount = await redisClient.del(round_id);
+        if (deleteCount === 0) {
+            return res.status(400).json({ error: "Round has already been processed (duplicate request)." });
+        }
 
         // 1. Calculate the cashout amount (always 2.00x the base bet)
         const amountWon = roundData.betAmount * GAME_CONSTANTS.STEP_1.PAYOUT_MULTIPLIER;
-        const newBalance = balance + amountWon;
+        
+        // 1b. Credit the wallet
+        const newBalance = await walletService.credit(token, player_id, amountWon, round_id, `${round_id}_credit_cashout`);
 
-        // 2. Clean up the completed round from Redis
-        await redisClient.del(round_id);
+        // 2. Save permanent audit record
+        await saveAuditLog(round_id, {
+            action: 'CASHOUT',
+            clientSeed: roundData.clientSeed,
+            serverSeed: roundData.serverSeed,
+            betAmount: roundData.betAmount,
+            finalMultiplier: GAME_CONSTANTS.STEP_1.PAYOUT_MULTIPLIER,
+            amountWon,
+            finalBalance: newBalance,
+        });
 
-        // 3. Send the final response
+        // 4. Send the final response
         res.json({
             message: "Cashed out successfully",
             amount_won: amountWon,
             balance: newBalance,
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+/**
+ * @route GET /api/history/:roundId
+ * @description Retrieves the permanent audit record for a specific completed round.
+ */
+app.get('/api/history/:roundId', async (req, res, next) => {
+    try {
+        const { roundId } = req.params;
+        const record = await redisClient.get(`history:${roundId}`);
+
+        if (!record) {
+            return res.status(404).json({ error: "Audit record not found for this round." });
+        }
+
+        res.json(JSON.parse(record));
+    } catch (error) {
+        next(error);
+    }
+});
+
+/**
+ * @route GET /api/history
+ * @description Retrieves a list of recent completed game rounds for audit inspection.
+ */
+app.get('/api/history', async (req, res, next) => {
+    try {
+        const limit = parseInt(req.query.limit) || 20;
+        const keys = await redisClient.lRange('global_game_history', 0, limit - 1);
+
+        if (!keys || keys.length === 0) {
+            return res.json({ count: 0, history: [] });
+        }
+
+        const historyRecords = [];
+        for (const key of keys) {
+            const data = await redisClient.get(key);
+            if (data) {
+                historyRecords.push(JSON.parse(data));
+            }
+        }
+
+        res.json({
+            count: historyRecords.length,
+            history: historyRecords,
         });
     } catch (error) {
         next(error);
