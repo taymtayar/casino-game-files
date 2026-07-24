@@ -104,7 +104,43 @@ During the final backend audit, two critical, industry-standard vulnerabilities 
 
 ---
 
-## 5. Current Project State & Next Steps
+## 5. Local Development Setup
+
+To run this backend locally, you will need **Node.js** and **Redis**. We recommend using Docker to run Redis easily without system-level installations.
+
+### Prerequisites
+- Node.js (v18+)
+- Docker Desktop (for Redis)
+
+### Step-by-Step Installation
+
+1. **Start the Redis Database (via Docker)**
+   Open a terminal and run the following command to spin up a local Redis container on the default port (6379):
+   ```bash
+   docker run -d --name igaming-redis -p 6379:6379 redis
+   ```
+   *Note: The RGS relies heavily on Redis for state and audit logging. The server will crash on startup if Redis is not running.*
+
+2. **Install Node Dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Start the Mock Casino Operator**
+   In a new terminal window, start the mock wallet server (simulates Stake/Hub88 APIs):
+   ```bash
+   node mockOperator.js
+   ```
+
+4. **Start the Game Server**
+   In another terminal, start the main Remote Game Server:
+   ```bash
+   npm start
+   ```
+
+---
+
+## 6. Current Project State & Next Steps
 
 **Current State:** 
 - The RGS Backend is 100% complete, fully audited, and tested.
