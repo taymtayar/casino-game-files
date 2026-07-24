@@ -26,10 +26,10 @@ const GAME_CONSTANTS = {
         PAYOUT_MULTIPLIER: 2.00,
     },
     STEP_2_TIERS: [
-        { name: 'Mythic', probability: 0.0001, multiplier: 1000.00 }, // 0.01%
+        { name: 'Exotic', probability: 0.0001, multiplier: 1000.00 }, // 0.01%
         { name: 'Legendary', probability: 0.0010, multiplier: 100.00 }, // 0.10%
         { name: 'Epic', probability: 0.0400, multiplier: 10.00 },   // 4.00%
-        { name: 'Uncommon', probability: 0.4000, multiplier: 3.50 },    // 40.00%
+        { name: 'Rare', probability: 0.4000, multiplier: 3.50 },    // 40.00%
         // The remaining 55.89% is the Bust outcome
     ],
 };

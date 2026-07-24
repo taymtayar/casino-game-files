@@ -30,10 +30,10 @@ If the player chooses to Double Down, a second RNG event evaluates which tier th
 **Double Down Tiers & Probabilities:**
 | Tier Name | Multiplier | Probability |
 | :--- | :--- | :--- |
-| **Mythic** | 1000.00x | 0.01% |
+| **Exotic** | 1000.00x | 0.01% |
 | **Legendary** | 100.00x | 0.10% |
 | **Epic** | 10.00x | 4.00% |
-| **Uncommon** | 3.50x | 40.00% |
+| **Rare** | 3.50x | 40.00% |
 | **Bust** | 0.00x | 55.89% (Implied) |
 
 *Note: The multipliers are applied to the **original base bet**, not the Step 1 payout.*
@@ -121,9 +121,10 @@ To run this backend locally, you will need **Node.js** and **Redis**. We recomme
    ```
    *Note: The RGS relies heavily on Redis for state and audit logging. The server will crash on startup if Redis is not running.*
 
-2. **Install Node Dependencies**
+2. **Install Node Dependencies & Set Up Config**
    ```bash
    npm install
+   cp .env.example .env   # dotenv loads .env automatically; defaults work out of the box
    ```
 
 3. **Start the Mock Casino Operator**

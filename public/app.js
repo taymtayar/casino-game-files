@@ -4,6 +4,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const betAmount = 1.00;
     let currentRoundId = null;
 
+    // The RGS requires a session token and player_id on every request (it uses them to
+    // call the operator's wallet). For local testing these are placeholders; player_id
+    // must match a player defined in mockOperator.js.
+    const TOKEN = 'demo-token';
+    const PLAYER_ID = 'player_1';
+
     // --- DOM Elements ---
     const balanceAmountEl = document.getElementById('balance-amount');
     const messageEl = document.getElementById('message');
@@ -39,7 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({
                     clientSeed: `client-seed-${Date.now()}`,
                     betAmount,
-                    balance,
+                    token: TOKEN,
+                    player_id: PLAYER_ID,
                 }),
             });
             const data = await response.json();
@@ -71,7 +78,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     round_id: currentRoundId,
-                    balance,
+                    token: TOKEN,
+                    player_id: PLAYER_ID,
                 }),
             });
             const data = await response.json();
