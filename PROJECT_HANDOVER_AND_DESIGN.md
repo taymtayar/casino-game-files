@@ -13,12 +13,12 @@ This document is intended to provide a clear understanding of the project's curr
 
 ### Step 1: The Initial Bet
 - **Payout:** 2.00x the initial bet amount.
-- **Win Probability:** 47.50%
-- **House Edge:** 5.00%
+- **Win Probability:** 48.25%
+- **House Edge:** 3.50% (Calculated from Step 1 margin)
 - **Flow:** 
   - The player places a bet (e.g., $1.00).
   - The game evaluates a random number between 0.0 and 100.0.
-  - If the roll is under 47.50, the player wins the Step 1 phase and the current prize is $2.00.
+  - If the roll is under 48.25, the player wins the Step 1 phase and the current prize is $2.00.
   - If the player loses, the round is over, and the bet is lost.
 - **Player Choice:** If the player wins Step 1, they are presented with two options:
   1. **Cashout:** Take the 2.00x payout.
@@ -30,11 +30,11 @@ If the player chooses to Double Down, a second RNG event evaluates which tier th
 **Double Down Tiers & Probabilities:**
 | Tier Name | Multiplier | Probability |
 | :--- | :--- | :--- |
-| **Bronze** | 2.50x | 20.00% |
-| **Silver** | 3.50x | 10.00% |
-| **Gold** | 5.00x | 5.00% |
-| **Diamond** | 10.00x | 1.00% |
-| **Bust** | 0.00x | 64.00% (Implied) |
+| **Mythic** | 1000.00x | 0.01% |
+| **Legendary** | 100.00x | 0.10% |
+| **Epic** | 10.00x | 4.00% |
+| **Uncommon** | 3.50x | 40.00% |
+| **Bust** | 0.00x | 55.89% (Implied) |
 
 *Note: The multipliers are applied to the **original base bet**, not the Step 1 payout.*
 
