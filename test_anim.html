@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <style>
+    body {
+      background: #2a1a3a;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      font-family: sans-serif;
+      color: white;
+      flex-direction: column;
+    }
+
+    .preview-box {
+      width: 250px;
+      height: 250px;
+      position: relative;
+      border: 2px dashed #f0c040;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.5);
+      margin-top: 20px;
+    }
+
+    .cash-anim {
+      position: absolute;
+      inset: -5%;
+      width: 110%;
+      height: 110%;
+      background-image: url('assets/cops_and_robbers/sprites/cash_anim.png');
+      background-size: 400% 100%;
+      animation: play-cash 1.2s step-end infinite;
+      image-rendering: pixelated;
+    }
+
+    @keyframes play-cash {
+      0% {
+        background-position: 0% center;
+      }
+
+      /* First: Top Left (Exploded) */
+      25% {
+        background-position: 66.666% center;
+      }
+
+      /* Second: Top Right (1 flying) */
+      50% {
+        background-position: 33.333% center;
+      }
+
+      /* Third: Top Mid (Stack) */
+      75% {
+        background-position: 100% center;
+      }
+
+      /* Fourth: Bottom Left (Stack) */
+    }
+
+    .anim-container-cop {
+      width: 158px;
+      height: 110px;
+      border: 2px dashed #00e5ff;
+      position: relative;
+      margin-bottom: 20px;
+      display: inline-block;
+      margin-left: 20px;
+    }
+
+    .anim-container-cop::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      height: 110%;
+      aspect-ratio: 256 / 434;
+      background-image: url('assets/cops_and_robbers/sprites/cop_anim.png');
+      background-size: 400% 100%;
+      animation: play-cop 0.6s step-end infinite;
+      image-rendering: pixelated;
+    }
+
+    @keyframes play-cop {
+      0% {
+        background-position: 0% center;
+      }
+
+      25% {
+        background-position: 66.666% center;
+      }
+
+      /* was 33.333% */
+      50% {
+        background-position: 33.333% center;
+      }
+
+      /* was 66.666% */
+      75% {
+        background-position: 100% center;
+      }
+    }
+
+    .anim-container-siren {
+      width: 158px;
+      height: 110px;
+      border: 2px dashed #ff0055;
+      position: relative;
+      margin-bottom: 20px;
+      display: inline-block;
+      margin-left: 20px;
+    }
+
+    .anim-container-siren::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      height: 110%;
+      aspect-ratio: 1 / 1;
+      background-image: url('assets/cops_and_robbers/sprites/siren_anim_fixed.png');
+      background-size: 600% 100%;
+      animation: play-siren .6s step-end infinite;
+      image-rendering: pixelated;
+    }
+
+    @keyframes play-siren {
+      0% {
+        background-position: 0% center;
+      }
+
+      16.666% {
+        background-position: 20% center;
+      }
+
+      33.333% {
+        background-position: 40% center;
+      }
+
+      50% {
+        background-position: 60% center;
+      }
+
+      66.666% {
+        background-position: 80% center;
+      }
+
+      83.333% {
+        background-position: 100% center;
+      }
+    }
+
+    .anim-container-gold {
+      width: 110px;
+      height: 110px;
+      border: 2px dashed #ffaa00;
+      position: relative;
+      margin-bottom: 20px;
+      display: inline-block;
+      margin-left: 20px;
+    }
+
+    .anim-container-gold::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      height: 110%;
+      aspect-ratio: 1 / 1;
+      background-image: url('assets/cops_and_robbers/sprites/gold_anim.png');
+      background-size: 500% 100%;
+      animation: play-gold .75s step-end infinite;
+      image-rendering: pixelated;
+    }
+
+    @keyframes play-gold {
+      0% {
+        background-position: 0% center;
+      }
+
+      20% {
+        background-position: 25% center;
+      }
+
+      40% {
+        background-position: 50% center;
+      }
+
+      60% {
+        background-position: 75% center;
+      }
+
+      80% {
+        background-position: 100% center;
+      }
+    }
+
+    .anim-container-wild {
+      width: 110px;
+      height: 110px;
+      border: 2px dashed #9900ff;
+      position: relative;
+      margin-bottom: 20px;
+      display: inline-block;
+      margin-left: 20px;
+    }
+
+    .anim-container-wild::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      height: 110%;
+      aspect-ratio: 1 / 1;
+      background-image: url('assets/cops_and_robbers/sprites/wild_anim.png');
+      background-size: 300% 100%;
+      animation: play-wild .8s step-end infinite;
+      image-rendering: pixelated;
+    }
+
+    @keyframes play-wild {
+      0% {
+        background-position: 0% center;
+      }
+
+      33.333% {
+        background-position: 50% center;
+      }
+
+      66.666% {
+        background-position: 100% center;
+      }
+    }
+
+    .anim-container-watch {
+      width: 110px;
+      height: 110px;
+      border: 2px dashed #0099ff;
+      position: relative;
+      margin-bottom: 20px;
+      display: inline-block;
+      margin-left: 20px;
+    }
+
+    .anim-container-watch::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      height: 110%;
+      aspect-ratio: 1 / 1;
+      background-image: url('assets/cops_and_robbers/sprites/watch_anim.png');
+      background-size: 300% 100%;
+      animation: play-watch .6s step-end infinite;
+      image-rendering: pixelated;
+    }
+
+    @keyframes play-watch {
+      0% {
+        background-position: 0% center;
+      }
+
+      33.333% {
+        background-position: 50% center;
+      }
+
+      66.666% {
+        background-position: 100% center;
+      }
+    }
+
+    .anim-container-necklace {
+      width: 110px;
+      height: 110px;
+      border: 2px dashed #ff0099;
+      position: relative;
+      margin-bottom: 20px;
+      display: inline-block;
+      margin-left: 20px;
+    }
+
+    .anim-container-necklace::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      height: 110%;
+      aspect-ratio: 1 / 1;
+      background-image: url('assets/cops_and_robbers/sprites/necklace_anim.png');
+      background-size: 300% 100%;
+      animation: play-necklace .6s step-end infinite;
+      image-rendering: pixelated;
+    }
+
+    @keyframes play-necklace {
+      0% {
+        background-position: 0% center;
+      }
+
+      33.333% {
+        background-position: 50% center;
+      }
+
+      66.666% {
+        background-position: 100% center;
+      }
+    }
+
+    .anim-container-vault {
+      width: 158px;
+      height: 158px;
+      border: 2px dashed #bbbbbb;
+      position: relative;
+      margin-bottom: 20px;
+      display: inline-block;
+      margin-left: 20px;
+    }
+
+    .anim-container-vault::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      height: 110%;
+      aspect-ratio: 1 / 1;
+      background-image: url('assets/cops_and_robbers/sprites/S_vault_anim.png');
+      background-size: 300% 100%;
+      animation: play-vault .9s step-end infinite;
+      image-rendering: pixelated;
+    }
+
+    @keyframes play-vault {
+      0% {
+        background-position: 0% center;
+      }
+
+      33.333% {
+        background-position: 50% center;
+      }
+
+      66.666% {
+        background-position: 100% center;
+      }
+    }
+
+    .tests-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 40px;
+      padding: 20px;
+    }
+
+    .test-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    h2 {
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="tests-container">
+    <div class="test-box">
+      <h2>Cash Animation Test</h2>
+      <div class="preview-box">
+        <div class="cash-anim"></div>
+      </div>
+    </div>
+
+    <div class="test-box">
+      <h2>Cop Animation Test</h2>
+      <div class="anim-container-cop"></div>
+    </div>
+
+    <div class="test-box">
+      <h2>Siren Animation Test</h2>
+      <div class="anim-container-siren"></div>
+    </div>
+
+    <div class="test-box">
+      <h2>Gold Bar Animation Test</h2>
+      <div class="anim-container-gold"></div>
+    </div>
+
+    <div class="test-box">
+      <h2>Wild Animation Test</h2>
+      <div class="anim-container-wild"></div>
+    </div>
+
+    <div class="test-box">
+      <h2>Watch Animation Test</h2>
+      <div class="anim-container-watch"></div>
+    </div>
+
+    <div class="test-box">
+      <h2>Necklace Animation Test</h2>
+      <div class="anim-container-necklace"></div>
+    </div>
+
+    <div class="test-box">
+      <h2>Scatter Vault Animation Test</h2>
+      <div class="anim-container-vault"></div>
+    </div>
+  </div>
+</body>
+
+</html>
